@@ -1,0 +1,27 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+
+# Load the dataset
+df = pd.read_csv("insurance.csv")
+
+# Function to run linear regression
+def run_regression(x_col, y_col):
+    X = sm.add_constant(df[x_col])  # Adds a constant term to the predictor
+    y = df[y_col]
+    model = sm.OLS(y, X).fit()
+    print(f"\nRegression Summary: {y_col} ~ {x_col}")
+    print(model.summary())
+
+# Plot and analyze Age vs BMI
+sns.lmplot(x="age", y="bmi", data=df)
+plt.title("Regression: Age vs BMI")
+plt.show()
+run_regression("age", "bmi")
+
+# Plot and analyze Age vs Charges
+sns.lmplot(x="age", y="charges", data=df)
+plt.title("Regression: Age vs Charges")
+plt.show()
+run_regression("age", "charges")
