@@ -1,0 +1,79 @@
+import numpy as np
+from hmmlearn import hmm
+from sklearn.datasets import fetch_openml
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, confusion_matrix
+import matplotlib.pyplot as plt
+
+# 1. Load MNIST data
+print("Loading MNIST...")
+X, y = fetch_openml('mnist_784', version=1, return_X_y=True, as_frame=False)
+X = X / 255.0  # normalize
+y = y.astype(int)
+
+# 2. Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 3. Feature extraction: convert each 28x28 image into 14 "vertical strips" of 2-pixel width
+def extract_features(images):
+    n_samples = images.shape[0]
+    features = []
+    for img in images:
+        img = img.reshape(28, 28)
+        seq = []
+        for i in range(0, 28, 2):
+            strip = img[:, i:i+2]
+            density = strip.sum()  # total ink in the strip
+            center = np.argwhere(strip > 0).mean(axis=0) if np.any(strip > 0) else [0, 0]
+            seq.append([density, *center])
+        features.append(np.array(seq))
+    return features
+
+print("Extracting features...")
+X_train_feat = extract_features(X_train)
+X_test_feat = extract_features(X_test)
+
+# 4. Train one HMM per digit class
+models = {}
+n_states = 7  # You can tune this
+
+print("Training HMMs...")
+for digit in range(10):
+    digit_feats = [x for x, label in zip(X_train_feat, y_train) if label == digit]
+    lengths = [len(seq) for seq in digit_feats]
+    X_concat = np.concatenate(digit_feats)
+    
+    model = hmm.GaussianHMM(n_components=n_states, covariance_type='diag', n_iter=20, verbose=False)
+    model.fit(X_concat, lengths)
+    models[digit] = model
+    print(f"Trained HMM for digit {digit}")
+
+# 5. Predict on test set
+print("Testing...")
+y_pred = []
+
+for features in X_test_feat:
+    scores = []
+    for digit, model in models.items():
+        try:
+            score = model.score(features)
+        except:
+            score = -np.inf
+        scores.append(score)
+    y_pred.append(np.argmax(scores))
+
+# 6. Evaluation
+acc = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {acc:.4f}")
+
+cm = confusion_matrix(y_test, y_pred)
+print("Confusion Matrix:")
+print(cm)
+
+# 7. Show some predictions
+for i in range(5):
+    img = X_test[i].reshape(28, 28)
+    plt.imshow(img, cmap='gray')
+    plt.title(f"True: {y_test[i]}, Predicted: {y_pred[i]}")
+    plt.axis('off')
+    plt.show()
